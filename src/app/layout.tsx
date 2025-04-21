@@ -32,7 +32,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} grid min-h-svh grid-rows-[auto,1fr,auto] antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} grid min-h-svh grid-rows-[auto_1fr_auto] antialiased`}
       >
         <Header />
         {children}
