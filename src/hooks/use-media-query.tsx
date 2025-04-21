@@ -1,44 +1,70 @@
-import { useEffect, useState } from 'react';
+import debounce from 'lodash/debounce';
+import { useEffect, useRef, useState } from 'react';
 
-export type MediaQueryType = 'mobile' | 'tablet' | 'desktop';
+import { useBrowserClient } from './use-browser-client';
 
-export default function useMediaQuery(defaultState?: MediaQueryType) {
+export type MediaQueryType = 'mobile' | 'tablet' | 'desktop' | 'smarttv';
+
+export default function useMediaQuery(defaultMediaType?: MediaQueryType) {
+  const isBrowserClient = useBrowserClient();
+
   const [device, setDevice] = useState<MediaQueryType | undefined>(
-    defaultState,
+    defaultMediaType === 'smarttv' ? 'desktop' : defaultMediaType,
   );
+
   const [dimensions, setDimensions] = useState<
-    | {
-        width: number;
-        height: number;
-      }
-    | undefined
+    { width: number; height: number } | undefined
   >();
 
+  // Ref to store the latest device and dimensions for less rerenders
+  // This is necessary to avoid stale closures in the event handler
+  // and ensure that we are always comparing against the latest values.
+  const latestDevice = useRef(device);
+  const latestDimensions = useRef(dimensions);
+
   useEffect(() => {
+    if (!isBrowserClient) return;
+
     const checkDevice = () => {
-      if (window.matchMedia('(max-width: 640px)').matches) {
-        setDevice('mobile');
-      } else if (
-        window.matchMedia('(min-width: 641px) and (max-width: 1024px)').matches
-      ) {
-        setDevice('tablet');
+      let newDevice: MediaQueryType;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      if (width <= 768) {
+        newDevice = 'mobile';
+      } else if (width <= 960) {
+        newDevice = 'tablet';
       } else {
-        setDevice('desktop');
+        newDevice = 'desktop';
       }
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
+
+      const newDimensions = { width, height };
+
+      // Update device only if changed
+      if (latestDevice.current !== newDevice) {
+        latestDevice.current = newDevice;
+        setDevice(newDevice);
+      }
+
+      // Update dimensions only if changed
+      if (
+        latestDimensions.current?.width !== width ||
+        latestDimensions.current?.height !== height
+      ) {
+        latestDimensions.current = newDimensions;
+        setDimensions(newDimensions);
+      }
     };
 
-    // Initial detection
+    const debouncedCheckDevice = debounce(checkDevice, 100);
+
     checkDevice();
+    window.addEventListener('resize', debouncedCheckDevice);
 
-    // Listener for windows resize
-    window.addEventListener('resize', checkDevice);
-
-    // Cleanup listener
     return () => {
-      window.removeEventListener('resize', checkDevice);
+      window.removeEventListener('resize', debouncedCheckDevice);
     };
-  }, []);
+  }, [isBrowserClient]);
 
   return {
     device,
